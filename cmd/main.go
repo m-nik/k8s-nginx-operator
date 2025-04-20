@@ -39,6 +39,8 @@ import (
 
 	webv1alpha1 "github.com/m-nik/k8s-operator-task/api/v1alpha1"
 	"github.com/m-nik/k8s-operator-task/internal/controller"
+	"net/http"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -48,6 +50,12 @@ var (
 )
 
 func init() {
+        
+        go func() {
+            http.Handle("/metrics", promhttp.Handler())
+            _ = http.ListenAndServe(":8080", nil)
+        }()
+	
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(webv1alpha1.AddToScheme(scheme))
@@ -235,6 +243,12 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+
+        // start metrics server
+        go func() {
+            http.Handle("/metrics", promhttp.Handler())
+            _ = http.ListenAndServe(":8080", nil)
+        }()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

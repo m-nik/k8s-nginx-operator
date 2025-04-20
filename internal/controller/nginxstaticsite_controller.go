@@ -17,8 +17,32 @@ import (
     intstr "k8s.io/apimachinery/pkg/util/intstr"
     "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
     "time"
-
+    "github.com/prometheus/client_golang/prometheus"
 )
+
+
+// prometheus metrics
+var (
+    activeDeployments = prometheus.NewGauge(
+        prometheus.GaugeOpts{
+            Name: "nginx_active_deployments",
+            Help: "Number of active Nginx deployments",
+        },
+    )
+    failedReconciliations = prometheus.NewCounter(
+        prometheus.CounterOpts{
+            Name: "nginx_failed_reconciliations_total",
+            Help: "Total number of failed reconciliation attempts",
+        },
+    )
+    totalStorageUsed = prometheus.NewGauge(
+        prometheus.GaugeOpts{
+            Name: "nginx_total_storage_bytes",
+            Help: "Total storage requested by Nginx PVCs (bytes)",
+        },
+    )
+)
+
 
 type NginxStaticSiteReconciler struct {
 	client.Client
@@ -98,6 +122,7 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
     err := r.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: site.Namespace}, pvc)
     
     desiredSize := resourceMustParse(site.Spec.StorageSize)
+    totalStorageUsed.Set(float64(desiredSize.Value()))
     
     if err != nil && errors.IsNotFound(err) {
         // PVC not exists, create
@@ -209,11 +234,15 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if err := ctrl.SetControllerReference(&site, deploy, r.Scheme); err == nil {
             if err := r.Create(ctx, deploy); err != nil {
                 logger.Error(err, "failed to create deployment")
+		failedReconciliations.Inc()
                 site.Status.Phase = "Failed"
                 r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
-        }
+        } else {
+	        activeDeployments.Set(1)
+	}
+
     } else if err == nil {
         // Deployment exists, update
         updated := false
@@ -238,14 +267,17 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if updated {
             if err := r.Update(ctx, existingDeploy); err != nil {
                 logger.Error(err, "failed to update deployment")
+		failedReconciliations.Inc()
                 site.Status.Phase = "Failed"
                 r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
             logger.Info("Updated deployment successfully", "name", site.Name)
+	    activeDeployments.Set(1)
         }
     } else {
         site.Status.Phase = "Failed"
+	failedReconciliations.Inc()
         r.Status().Update(ctx, &site)
         return ctrl.Result{}, err
     }
@@ -409,6 +441,9 @@ func resourceMustParse(size string) resource.Quantity {
 }
 
 func (r *NginxStaticSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
+    
+    prometheus.MustRegister(activeDeployments, failedReconciliations, totalStorageUsed)
+    
     return ctrl.NewControllerManagedBy(mgr).
         For(&webv1alpha1.NginxStaticSite{}).
         Complete(r)
