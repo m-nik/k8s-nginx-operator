@@ -12,8 +12,10 @@ import (
     ctrl "sigs.k8s.io/controller-runtime"
     "sigs.k8s.io/controller-runtime/pkg/client"
     "sigs.k8s.io/controller-runtime/pkg/log"
-
+    networkingv1 "k8s.io/api/networking/v1"
     webv1alpha1 "github.com/m-nik/k8s-operator-task/api/v1alpha1"
+    intstr "k8s.io/apimachinery/pkg/util/intstr"
+
 )
 
 type NginxStaticSiteReconciler struct {
@@ -37,7 +39,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 
 
-    // PVC
+    // ===== PVC =====
+    // ===============
     pvc := &corev1.PersistentVolumeClaim{}
     pvcName := site.Name + "-pvc"
     err := r.Get(ctx, client.ObjectKey{Name: pvcName, Namespace: site.Namespace}, pvc)
@@ -92,7 +95,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 
 
-    // Deployment
+    // = Deployment ==
+    // ===============
     existingDeploy := &appsv1.Deployment{}
     err = r.Get(ctx, client.ObjectKey{
         Name:      site.Name + "-nginx",
@@ -182,6 +186,115 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         return ctrl.Result{}, err
     }
 
+    // === Service ===
+    // ===============
+    svc := &corev1.Service{}
+    svcName := site.Name + "-svc"
+    err = r.Get(ctx, client.ObjectKey{Name: svcName, Namespace: site.Namespace}, svc)
+    
+    if err != nil && errors.IsNotFound(err) {
+        svc = &corev1.Service{
+            ObjectMeta: metav1.ObjectMeta{
+                Name:      svcName,
+                Namespace: site.Namespace,
+            },
+            Spec: corev1.ServiceSpec{
+                Selector: map[string]string{"app": site.Name},
+                Ports: []corev1.ServicePort{
+                    {
+                        Port:     80,
+                        Protocol: corev1.ProtocolTCP,
+                        TargetPort: intstr.FromInt(80),
+                    },
+                },
+                Type: corev1.ServiceTypeClusterIP,
+            },
+        }
+        if err := ctrl.SetControllerReference(&site, svc, r.Scheme); err == nil {
+            if err := r.Create(ctx, svc); err != nil {
+                logger.Error(err, "failed to create service")
+                return ctrl.Result{}, err
+            }
+        }
+    } else if err == nil {
+        updated := false
+        if svc.Spec.Type != corev1.ServiceTypeClusterIP {
+            svc.Spec.Type = corev1.ServiceTypeClusterIP
+            updated = true
+        }
+        if updated {
+            if err := r.Update(ctx, svc); err != nil {
+                logger.Error(err, "failed to update service")
+                return ctrl.Result{}, err
+            }
+        }
+    } else {
+        return ctrl.Result{}, err
+    }
+
+
+    // === Ingress ===
+    // ===============
+    ing := &networkingv1.Ingress{}
+    ingName := site.Name + "-ing"
+    pathPrefix := "/" + site.Name
+    
+    err = r.Get(ctx, client.ObjectKey{Name: ingName, Namespace: site.Namespace}, ing)
+    if err != nil && errors.IsNotFound(err) {
+        ing = &networkingv1.Ingress{
+            ObjectMeta: metav1.ObjectMeta{
+                Name:      ingName,
+                Namespace: site.Namespace,
+            },
+            Spec: networkingv1.IngressSpec{
+                Rules: []networkingv1.IngressRule{
+                    {
+                        IngressRuleValue: networkingv1.IngressRuleValue{
+                            HTTP: &networkingv1.HTTPIngressRuleValue{
+                                Paths: []networkingv1.HTTPIngressPath{
+                                    {
+                                        Path:     pathPrefix,
+                                        PathType: func() *networkingv1.PathType { pt := networkingv1.PathTypePrefix; return &pt }(),
+                                        Backend: networkingv1.IngressBackend{
+                                            Service: &networkingv1.IngressServiceBackend{
+                                                Name: svcName,
+                                                Port: networkingv1.ServiceBackendPort{
+                                                    Number: 80,
+                                                },
+                                            },
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        }
+    
+        if err := ctrl.SetControllerReference(&site, ing, r.Scheme); err == nil {
+            if err := r.Create(ctx, ing); err != nil {
+                logger.Error(err, "failed to create ingress")
+                return ctrl.Result{}, err
+            }
+        }
+    } else if err == nil {
+        updated := false
+        paths := ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths
+        if len(paths) == 0 || paths[0].Path != pathPrefix {
+            ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths[0].Path = pathPrefix
+            updated = true
+        }
+        if updated {
+            if err := r.Update(ctx, ing); err != nil {
+                logger.Error(err, "failed to update ingress")
+                return ctrl.Result{}, err
+            }
+        }
+    } else {
+        return ctrl.Result{}, err
+    }
+    
 
 
     site.Status.Phase = "Running"
