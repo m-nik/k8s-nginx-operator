@@ -388,6 +388,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
     site.Status.ReadyReplicas = readyCount
     if readyCount < site.Spec.Replicas {
         site.Status.Phase = "Pending"
+	// Exponential backoff
+        return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
     } else {
         site.Status.Phase = "Running"
     }
