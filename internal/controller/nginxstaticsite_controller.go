@@ -371,8 +371,26 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
     
 
 
-    site.Status.Phase = "Running"
-    site.Status.ReadyReplicas = site.Spec.Replicas
+
+    // Self-healing
+    podList := &corev1.PodList{}
+    _ = r.List(ctx, podList, client.InNamespace(site.Namespace), client.MatchingLabels{"app": site.Name})
+
+    readyCount := int32(0)
+    for _, pod := range podList.Items {
+        for _, cond := range pod.Status.Conditions {
+            if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
+                readyCount++
+            }
+        }
+    }
+
+    site.Status.ReadyReplicas = readyCount
+    if readyCount < site.Spec.Replicas {
+        site.Status.Phase = "Pending"
+    } else {
+        site.Status.Phase = "Running"
+    }
     r.Status().Update(ctx, &site)
 
     logger.Info("Reconciled NginxStaticSite successfully", "name", site.Name)
