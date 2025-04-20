@@ -1,13 +1,13 @@
 # nginxstaticsite
 
-# Important tip
+### Important tip
 Given that I did not have enough time to complete this task, the core of the work, including the operator being able to deploy and update the deployment based on the CRD, as well as create PVCs, has been done and tested. Creating and updating the service and ingress, as well as Prometheus metrics, are among the items that have not been tested or debugged.
 
 [NginxStaticSite CRD yaml file](config/crd/bases/web.ictplus.ir_nginxstaticsites.yaml)
 
 [RBAC roles and bindings](config/rbac)
 
-# Install
+### Install
 - Clone the project:
 ```
 git clone https://github.com/m-nik/k8s-nginx-operator.git
