@@ -1,0 +1,14 @@
+apiVersion: web.ictplus.ir/v1alpha1
+kind: NginxStaticSite
+metadata:
+  labels:
+    app.kubernetes.io/name: nginxstaticsite
+    app.kubernetes.io/managed-by: kustomize
+  name: nginxstaticsite-sample
+spec:
+  replicas: 2
+  storageSize: 1Gi
+  imageVersion: "1.25-alpine"
+  staticFilePath: "/usr/share/nginx/html"
+  nodeSelector:
+    disktype: ssd
