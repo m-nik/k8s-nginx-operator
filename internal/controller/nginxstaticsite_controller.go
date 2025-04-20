@@ -23,6 +23,12 @@ type NginxStaticSiteReconciler struct {
 	Scheme *runtime.Scheme
 }
 
+// Finalizer
+const finalizerName = "nginxstaticsite.finalizers.ictplus.ir"
+
+
+
+// Reconcile
 func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
     logger := log.FromContext(ctx)
 
@@ -33,6 +39,48 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         }
         return ctrl.Result{}, err
     }
+
+
+    // Handling deletion and finalizer
+    if site.ObjectMeta.DeletionTimestamp.IsZero() {
+        // Add finalizer
+        if !controllerutil.ContainsFinalizer(&site, finalizerName) {
+            controllerutil.AddFinalizer(&site, finalizerName)
+            if err := r.Update(ctx, &site); err != nil {
+                return ctrl.Result{}, err
+            }
+        }
+    } else {
+        // Deleting
+        logger.Info("Cleaning up resources for deleted NginxStaticSite", "name", site.Name)
+    
+        // Delete Resources
+        _ = r.Delete(ctx, &appsv1.Deployment{
+            ObjectMeta: metav1.ObjectMeta{Name: site.Name + "-nginx", Namespace: site.Namespace},
+        })
+        _ = r.Delete(ctx, &corev1.Service{
+            ObjectMeta: metav1.ObjectMeta{Name: site.Name + "-svc", Namespace: site.Namespace},
+        })
+        _ = r.Delete(ctx, &networkingv1.Ingress{
+            ObjectMeta: metav1.ObjectMeta{Name: site.Name + "-ing", Namespace: site.Namespace},
+        })
+        _ = r.Delete(ctx, &corev1.PersistentVolumeClaim{
+            ObjectMeta: metav1.ObjectMeta{Name: site.Name + "-pvc", Namespace: site.Namespace},
+        })
+    
+        // Remove finalizer
+        controllerutil.RemoveFinalizer(&site, finalizerName)
+        if err := r.Update(ctx, &site); err != nil {
+            return ctrl.Result{}, err
+        }
+    
+        return ctrl.Result{}, nil
+    }
+    
+
+
+
+
 
     site.Status.Phase = "Creating"
     r.Status().Update(ctx, &site)
