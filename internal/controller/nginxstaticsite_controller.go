@@ -2,12 +2,10 @@ package controller
 
 import (
     "context"
-    //"fmt"
 
     appsv1 "k8s.io/api/apps/v1"
     corev1 "k8s.io/api/core/v1"
     metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-    //"k8s.io/apimachinery/pkg/types"
     "k8s.io/apimachinery/pkg/api/errors"
     "k8s.io/apimachinery/pkg/runtime"
     resource "k8s.io/apimachinery/pkg/api/resource"
@@ -55,7 +53,6 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         },
     }
     if err := ctrl.SetControllerReference(&site, pvc, r.Scheme); err == nil {
-        //_ = r.Create(ctx, pvc)
         if err := r.Create(ctx, pvc); err != nil {
             logger.Error(err, "failed to create PVC")
             return ctrl.Result{}, err
@@ -106,7 +103,6 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         },
     }
     if err := ctrl.SetControllerReference(&site, deploy, r.Scheme); err == nil {
-        //_ = r.Create(ctx, deploy)
 	if err := r.Create(ctx, deploy); err != nil {
             logger.Error(err, "failed to create deployment")
             return ctrl.Result{}, err
