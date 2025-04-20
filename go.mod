@@ -1,4 +1,4 @@
-module github.com/m-nik/k8s-operator-task
+module github.com/m-nik/k8s-nginx-operator
 
 go 1.23.0
 

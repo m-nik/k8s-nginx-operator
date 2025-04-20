@@ -37,8 +37,8 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	webv1alpha1 "github.com/m-nik/k8s-operator-task/api/v1alpha1"
-	"github.com/m-nik/k8s-operator-task/internal/controller"
+	webv1alpha1 "github.com/m-nik/k8s-nginx-operator/api/v1alpha1"
+	"github.com/m-nik/k8s-nginx-operator/internal/controller"
 	"net/http"
         "github.com/prometheus/client_golang/prometheus/promhttp"
 	// +kubebuilder:scaffold:imports

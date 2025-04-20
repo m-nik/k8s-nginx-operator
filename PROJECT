@@ -6,7 +6,7 @@ domain: ictplus.ir
 layout:
 - go.kubebuilder.io/v4
 projectName: nginxstaticsite
-repo: github.com/m-nik/k8s-operator-task
+repo: github.com/m-nik/k8s-nginx-operator
 resources:
 - api:
     crdVersion: v1
@@ -15,6 +15,6 @@ resources:
   domain: ictplus.ir
   group: web
   kind: NginxStaticSite
-  path: github.com/m-nik/k8s-operator-task/api/v1alpha1
+  path: github.com/m-nik/k8s-nginx-operator/api/v1alpha1
   version: v1alpha1
 version: "3"
