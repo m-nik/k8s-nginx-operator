@@ -1,63 +1,136 @@
-/*
-Copyright 2025.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
-	"context"
+    "context"
+    //"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+    appsv1 "k8s.io/api/apps/v1"
+    corev1 "k8s.io/api/core/v1"
+    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    //"k8s.io/apimachinery/pkg/types"
+    "k8s.io/apimachinery/pkg/api/errors"
+    "k8s.io/apimachinery/pkg/runtime"
+    resource "k8s.io/apimachinery/pkg/api/resource"
+    ctrl "sigs.k8s.io/controller-runtime"
+    "sigs.k8s.io/controller-runtime/pkg/client"
+    "sigs.k8s.io/controller-runtime/pkg/log"
 
-	webv1alpha1 "github.com/m-nik/k8s-operator-task/api/v1alpha1"
+    webv1alpha1 "github.com/m-nik/k8s-operator-task/api/v1alpha1"
 )
 
-// NginxStaticSiteReconciler reconciles a NginxStaticSite object
 type NginxStaticSiteReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=web.ictplus.ir,resources=nginxstaticsites,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=web.ictplus.ir,resources=nginxstaticsites/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=web.ictplus.ir,resources=nginxstaticsites/finalizers,verbs=update
-
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the NginxStaticSite object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.20.4/pkg/reconcile
 func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = logf.FromContext(ctx)
+    logger := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+    var site webv1alpha1.NginxStaticSite
+    if err := r.Get(ctx, req.NamespacedName, &site); err != nil {
+        if errors.IsNotFound(err) {
+            return ctrl.Result{}, nil
+        }
+        return ctrl.Result{}, err
+    }
 
-	return ctrl.Result{}, nil
+    site.Status.Phase = "Creating"
+    r.Status().Update(ctx, &site)
+
+    // PVC
+    pvc := &corev1.PersistentVolumeClaim{
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      site.Name + "-pvc",
+            Namespace: site.Namespace,
+        },
+        Spec: corev1.PersistentVolumeClaimSpec{
+            AccessModes: []corev1.PersistentVolumeAccessMode{
+                corev1.ReadWriteOnce,
+            },
+            Resources: corev1.VolumeResourceRequirements{
+                Requests: corev1.ResourceList{
+                    corev1.ResourceStorage: resourceMustParse(site.Spec.StorageSize),
+                },
+            },
+        },
+    }
+    if err := ctrl.SetControllerReference(&site, pvc, r.Scheme); err == nil {
+        //_ = r.Create(ctx, pvc)
+        if err := r.Create(ctx, pvc); err != nil {
+            logger.Error(err, "failed to create PVC")
+            return ctrl.Result{}, err
+        }
+    }
+
+    // Deployment
+    deploy := &appsv1.Deployment{
+        ObjectMeta: metav1.ObjectMeta{
+            Name:      site.Name + "-nginx",
+            Namespace: site.Namespace,
+        },
+        Spec: appsv1.DeploymentSpec{
+            Replicas: &site.Spec.Replicas,
+            Selector: &metav1.LabelSelector{
+                MatchLabels: map[string]string{"app": site.Name},
+            },
+            Template: corev1.PodTemplateSpec{
+                ObjectMeta: metav1.ObjectMeta{
+                    Labels: map[string]string{"app": site.Name},
+                },
+                Spec: corev1.PodSpec{
+                    NodeSelector: site.Spec.NodeSelector,
+                    Containers: []corev1.Container{
+                        {
+                            Name:  "nginx",
+                            Image: "nginx:" + site.Spec.ImageVersion,
+                            VolumeMounts: []corev1.VolumeMount{
+                                {
+                                    Name:      "static-content",
+                                    MountPath: site.Spec.StaticFilePath,
+                                },
+                            },
+                        },
+                    },
+                    Volumes: []corev1.Volume{
+                        {
+                            Name: "static-content",
+                            VolumeSource: corev1.VolumeSource{
+                                PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+                                    ClaimName: site.Name + "-pvc",
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    }
+    if err := ctrl.SetControllerReference(&site, deploy, r.Scheme); err == nil {
+        //_ = r.Create(ctx, deploy)
+	if err := r.Create(ctx, deploy); err != nil {
+            logger.Error(err, "failed to create deployment")
+            return ctrl.Result{}, err
+        }
+    }
+
+    site.Status.Phase = "Running"
+    site.Status.ReadyReplicas = site.Spec.Replicas
+    r.Status().Update(ctx, &site)
+
+    logger.Info("Reconciled NginxStaticSite successfully", "name", site.Name)
+
+    return ctrl.Result{}, nil
 }
 
-// SetupWithManager sets up the controller with the Manager.
+// helper to parse storage size like "1Gi"
+func resourceMustParse(size string) resource.Quantity {
+    q, _ := resource.ParseQuantity(size)
+    return q
+}
+
 func (r *NginxStaticSiteReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&webv1alpha1.NginxStaticSite{}).
-		Named("nginxstaticsite").
-		Complete(r)
+    return ctrl.NewControllerManagedBy(mgr).
+        For(&webv1alpha1.NginxStaticSite{}).
+        Complete(r)
 }
+
