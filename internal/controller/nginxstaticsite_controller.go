@@ -47,6 +47,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if !controllerutil.ContainsFinalizer(&site, finalizerName) {
             controllerutil.AddFinalizer(&site, finalizerName)
             if err := r.Update(ctx, &site); err != nil {
+                site.Status.Phase = "Failed"
+                r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
         }
@@ -117,6 +119,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if err := ctrl.SetControllerReference(&site, pvc, r.Scheme); err == nil {
             if err := r.Create(ctx, pvc); err != nil {
                 logger.Error(err, "failed to create PVC")
+                site.Status.Phase = "Failed"
+                r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
             logger.Info("Created PVC", "name", pvcName)
@@ -129,6 +133,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
             pvc.Spec.Resources.Requests[corev1.ResourceStorage] = desiredSize
             if err := r.Update(ctx, pvc); err != nil {
                 logger.Error(err, "failed to resize PVC")
+                site.Status.Phase = "Failed"
+                r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
             logger.Info("Resized PVC", "name", pvcName)
@@ -136,6 +142,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
     } else {
         // Unexpected error
         logger.Error(err, "failed to get PVC")
+        site.Status.Phase = "Failed"
+        r.Status().Update(ctx, &site)
         return ctrl.Result{}, err
     }
 
@@ -199,6 +207,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if err := ctrl.SetControllerReference(&site, deploy, r.Scheme); err == nil {
             if err := r.Create(ctx, deploy); err != nil {
                 logger.Error(err, "failed to create deployment")
+                site.Status.Phase = "Failed"
+                r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
         }
@@ -226,11 +236,15 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if updated {
             if err := r.Update(ctx, existingDeploy); err != nil {
                 logger.Error(err, "failed to update deployment")
+                site.Status.Phase = "Failed"
+                r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
             logger.Info("Updated deployment successfully", "name", site.Name)
         }
     } else {
+        site.Status.Phase = "Failed"
+        r.Status().Update(ctx, &site)
         return ctrl.Result{}, err
     }
 
@@ -261,6 +275,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if err := ctrl.SetControllerReference(&site, svc, r.Scheme); err == nil {
             if err := r.Create(ctx, svc); err != nil {
                 logger.Error(err, "failed to create service")
+                site.Status.Phase = "Failed"
+                r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
         }
@@ -273,10 +289,14 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if updated {
             if err := r.Update(ctx, svc); err != nil {
                 logger.Error(err, "failed to update service")
+                site.Status.Phase = "Failed"
+                r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
         }
     } else {
+        site.Status.Phase = "Failed"
+        r.Status().Update(ctx, &site)
         return ctrl.Result{}, err
     }
 
@@ -323,6 +343,8 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if err := ctrl.SetControllerReference(&site, ing, r.Scheme); err == nil {
             if err := r.Create(ctx, ing); err != nil {
                 logger.Error(err, "failed to create ingress")
+                site.Status.Phase = "Failed"
+                r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
         }
@@ -336,10 +358,14 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
         if updated {
             if err := r.Update(ctx, ing); err != nil {
                 logger.Error(err, "failed to update ingress")
+                site.Status.Phase = "Failed"
+                r.Status().Update(ctx, &site)
                 return ctrl.Result{}, err
             }
         }
     } else {
+        site.Status.Phase = "Failed"
+        r.Status().Update(ctx, &site)
         return ctrl.Result{}, err
     }
     
