@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: nginxstaticsite-sample
 spec:
-  replicas: 3
+  replicas: 2
   storageSize: 1Gi
   imageVersion: "1.25-alpine"
   staticFilePath: "/usr/share/nginx/html"

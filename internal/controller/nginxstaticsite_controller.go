@@ -429,7 +429,7 @@ func (r *NginxStaticSiteReconciler) Reconcile(ctx context.Context, req ctrl.Requ
     }
     r.Status().Update(ctx, &site)
 
-    logger.Info("Reconciled NginxStaticSite successfully", "name", site.Name)
+    //logger.Info("Reconciled NginxStaticSite successfully", "name", site.Name)
 
     return ctrl.Result{}, nil
 }

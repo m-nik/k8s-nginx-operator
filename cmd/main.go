@@ -244,12 +244,6 @@ func main() {
 		os.Exit(1)
 	}
 
-        // start metrics server
-        go func() {
-            http.Handle("/metrics", promhttp.Handler())
-            _ = http.ListenAndServe(":8080", nil)
-        }()
-
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
