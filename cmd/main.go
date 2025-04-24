@@ -53,7 +53,7 @@ func init() {
         
         go func() {
             http.Handle("/metrics", promhttp.Handler())
-            _ = http.ListenAndServe(":8080", nil)
+            _ = http.ListenAndServe(":8443", nil)
         }()
 	
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
