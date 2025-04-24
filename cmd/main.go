@@ -39,8 +39,8 @@ import (
 
 	webv1alpha1 "github.com/m-nik/k8s-nginx-operator/api/v1alpha1"
 	"github.com/m-nik/k8s-nginx-operator/internal/controller"
-	"net/http"
-        "github.com/prometheus/client_golang/prometheus/promhttp"
+	// "net/http"
+    //     "github.com/prometheus/client_golang/prometheus/promhttp"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -51,10 +51,10 @@ var (
 
 func init() {
         
-        go func() {
-            http.Handle("/metrics", promhttp.Handler())
-            _ = http.ListenAndServe(":8080", nil)
-        }()
+        // go func() {
+        //     http.Handle("/metrics", promhttp.Handler())
+        //     _ = http.ListenAndServe(":8080", nil)
+        // }()
 	
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
@@ -72,13 +72,13 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var tlsOpts []func(*tls.Config)
-	flag.StringVar(&metricsAddr, "metrics-bind-address", "0", "The address the metrics endpoint binds to. "+
+	flag.StringVar(&metricsAddr, "metrics-bind-address", "8080", "The address the metrics endpoint binds to. "+
 		"Use :8443 for HTTPS or :8080 for HTTP, or leave as 0 to disable the metrics service.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&secureMetrics, "metrics-secure", true,
+	flag.BoolVar(&secureMetrics, "metrics-secure", false,
 		"If set, the metrics endpoint is served securely via HTTPS. Use --metrics-secure=false to use HTTP instead.")
 	flag.StringVar(&webhookCertPath, "webhook-cert-path", "", "The directory that contains the webhook certificate.")
 	flag.StringVar(&webhookCertName, "webhook-cert-name", "tls.crt", "The name of the webhook certificate file.")
