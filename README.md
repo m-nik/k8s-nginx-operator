@@ -29,11 +29,10 @@ kubectl apply -f config/samples/web_v1alpha1_nginxstaticsite.yaml
 ```
 - Build, Push and deploy:
 ```
-make docker-build docker-push IMG=yourDockerRepo/nginx-operator:v0.1.12
-make deploy IMG=yourDockerRepo/nginx-operator:v0.1.12
+make docker-build docker-push deploy IMG=yourDockerRepo/nginx-operator:v0.1.13
 ```
 ##### OR
 - Only deploy:
 ```
-make deploy IMG=mojprogrammer/nginx-operator:v0.1.12
+make deploy IMG=mojprogrammer/nginx-operator:v0.1.13
 ```
