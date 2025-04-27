@@ -8,6 +8,12 @@ Given that I did not have enough time to complete this task, the core of the wor
 [RBAC roles and bindings](config/rbac)
 
 ### Install
+- Dependencies:
+  - go version v1.23.0+
+  - docker version 17.03+.
+  - kubectl version v1.11.3+.
+  - kubebuilder version v4.5.2+.
+
 - Clone the project:
 ```
 git clone https://github.com/m-nik/k8s-nginx-operator.git
